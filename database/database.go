@@ -4,9 +4,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/kyomel/go-gql-blogs/graph/model"
 	"github.com/kyomel/go-gql-blogs/utils"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type MongoInstance struct {
@@ -38,4 +42,83 @@ func Connect(dbName string) error {
 
 func GetCollection(name string) *mongo.Collection {
 	return DB.Database.Collection(name)
+}
+
+func SeedBlog() (model.Blog, error) {
+	blogFaker, err := utils.CreateFaker[utils.BlogFaker]()
+	if err != nil {
+		return model.Blog{}, err
+	}
+
+	author, err := SeedUser()
+	if err != nil {
+		return model.Blog{}, err
+	}
+
+	var blog model.Blog = model.Blog{
+		Title:     blogFaker.Title,
+		Content:   blogFaker.Content,
+		Author:    &author,
+		CreatedAt: time.Now(),
+	}
+
+	var collection *mongo.Collection = GetCollection("blogs")
+	result, err := collection.InsertOne(context.TODO(), blog)
+	if err != nil {
+		return model.Blog{}, err
+	}
+
+	var filter primitive.D = bson.D{{Key: "_id", Value: result.InsertedID}}
+	var createdRecord *mongo.SingleResult = collection.FindOne(context.TODO(), filter)
+
+	var createdBlog *model.Blog = &model.Blog{}
+
+	createdRecord.Decode(createdBlog)
+
+	return *createdBlog, nil
+}
+
+func SeedUser() (model.User, error) {
+	userFaker, err := utils.CreateFaker[utils.UserFaker]()
+	if err != nil {
+		return model.User{}, err
+	}
+
+	bs, err := bcrypt.GenerateFromPassword([]byte(userFaker.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return model.User{}, err
+	}
+
+	var password string = string(bs)
+
+	var user model.User = model.User{
+		Username:  userFaker.Username,
+		Email:     userFaker.Email,
+		Password:  password,
+		CreatedAt: time.Now(),
+	}
+
+	var collection *mongo.Collection = GetCollection("users")
+	result, err := collection.InsertOne(context.TODO(), user)
+	if err != nil {
+		return model.User{}, err
+	}
+
+	user.Password = userFaker.Password
+	user.ID = result.InsertedID.(primitive.ObjectID).Hex()
+
+	return user, nil
+}
+
+func CleanSeeders() {
+	var userCollection *mongo.Collection = GetCollection("users")
+	var blogCollection *mongo.Collection = GetCollection("blogs")
+
+	userErr := userCollection.Drop(context.TODO())
+	blogErr := blogCollection.Drop(context.TODO())
+
+	var isFailed bool = userErr != nil || blogErr != nil
+	if isFailed {
+		panic("error when deleting all data inside collection")
+	}
 }

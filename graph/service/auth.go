@@ -36,6 +36,7 @@ func (u *UserService) Register(input model.NewUser) string {
 	var collection *mongo.Collection = database.GetCollection(USER_COLLECTION)
 
 	res, err := collection.InsertOne(context.TODO(), user)
+
 	if err != nil {
 		return ""
 	}
@@ -43,6 +44,7 @@ func (u *UserService) Register(input model.NewUser) string {
 	var userId string = res.InsertedID.(primitive.ObjectID).Hex()
 
 	token, err := utils.GenerateNewAccessToken(userId)
+
 	if err != nil {
 		return ""
 	}
@@ -67,6 +69,7 @@ func (u *UserService) Login(input model.LoginInput) string {
 	}
 
 	token, err := utils.GenerateNewAccessToken(user.ID)
+
 	if err != nil {
 		return ""
 	}
@@ -74,14 +77,13 @@ func (u *UserService) Login(input model.LoginInput) string {
 	return token
 }
 
-func (u *UserService) GetUserByID(id string) (*model.User, error) {
+func (u *UserService) GetUser(id string) (*model.User, error) {
 	userID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return &model.User{}, errors.New("id is invalid")
 	}
 
 	var query primitive.D = bson.D{{Key: "_id", Value: userID}}
-
 	var collection *mongo.Collection = database.GetCollection(USER_COLLECTION)
 
 	var userData *mongo.SingleResult = collection.FindOne(context.TODO(), query)
@@ -90,7 +92,6 @@ func (u *UserService) GetUserByID(id string) (*model.User, error) {
 	}
 
 	var user *model.User = &model.User{}
-
 	userData.Decode(user)
 
 	return user, nil
