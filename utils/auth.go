@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,8 +15,6 @@ type TokenMetadata struct {
 }
 
 func GenerateNewAccessToken(userId string) (string, error) {
-	log.Println(userId, "cek user id di generate")
-
 	secret := GetValue("JWT_SECRET_KEY")
 
 	minutesCount, _ := strconv.Atoi(GetValue("JWT_SECRET_KEY_EXPIRE_MINUTES_COUNT"))
